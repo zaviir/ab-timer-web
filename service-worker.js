@@ -1,4 +1,4 @@
-const CACHE_NAME = "ab-timer-v7";
+const CACHE_NAME = "ab-timer-v8";
 const APP_ASSETS = [
   "./",
   "./index.html",
@@ -22,15 +22,23 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
+    (async () => {
+      const cacheNames = await caches.keys();
+      await Promise.all(
         cacheNames
           .filter((cacheName) => cacheName !== CACHE_NAME)
           .map((cacheName) => caches.delete(cacheName)),
       );
-    }),
+      await self.clients.claim();
+      const clients = await self.clients.matchAll({
+        includeUncontrolled: true,
+        type: "window",
+      });
+      clients.forEach((client) => {
+        client.postMessage({ type: "APP_UPDATED", cacheName: CACHE_NAME });
+      });
+    })(),
   );
-  self.clients.claim();
 });
 
 self.addEventListener("message", (event) => {

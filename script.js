@@ -45,21 +45,31 @@ if ("serviceWorker" in navigator) {
 
 async function registerServiceWorker() {
   try {
-    let refreshing = false;
-    navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (refreshing) return;
-      refreshing = true;
+    let reloadQueued = false;
+    const reloadForUpdate = () => {
+      if (reloadQueued) return;
+      reloadQueued = true;
       window.location.reload();
+    };
+    const activateWaitingWorker = (registration) => {
+      registration.waiting?.postMessage({ type: "SKIP_WAITING" });
+    };
+
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      reloadForUpdate();
+    });
+
+    navigator.serviceWorker.addEventListener("message", (event) => {
+      if (event.data?.type === "APP_UPDATED") {
+        reloadForUpdate();
+      }
     });
 
     const registration = await navigator.serviceWorker.register("./service-worker.js", {
       updateViaCache: "none",
     });
     await registration.update();
-
-    if (registration.waiting) {
-      registration.waiting.postMessage({ type: "SKIP_WAITING" });
-    }
+    activateWaitingWorker(registration);
 
     registration.addEventListener("updatefound", () => {
       const newWorker = registration.installing;
@@ -70,6 +80,16 @@ async function registerServiceWorker() {
           newWorker.postMessage({ type: "SKIP_WAITING" });
         }
       });
+    });
+
+    window.addEventListener("focus", () => {
+      registration.update().then(() => activateWaitingWorker(registration));
+    });
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        registration.update().then(() => activateWaitingWorker(registration));
+      }
     });
   } catch {
     // The app still works when opened from file:// or a browser blocks registration.
