@@ -1,4 +1,4 @@
-const CACHE_NAME = "ab-timer-v3";
+const CACHE_NAME = "ab-timer-v4";
 const APP_ASSETS = [
   "./",
   "./index.html",
