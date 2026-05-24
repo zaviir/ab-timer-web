@@ -39,10 +39,41 @@ if (saved) {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js").catch(() => {
-      // The app still works when opened from file:// or a browser blocks registration.
-    });
+    registerServiceWorker();
   });
+}
+
+async function registerServiceWorker() {
+  try {
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+
+    const registration = await navigator.serviceWorker.register("./service-worker.js", {
+      updateViaCache: "none",
+    });
+    await registration.update();
+
+    if (registration.waiting) {
+      registration.waiting.postMessage({ type: "SKIP_WAITING" });
+    }
+
+    registration.addEventListener("updatefound", () => {
+      const newWorker = registration.installing;
+      if (!newWorker) return;
+
+      newWorker.addEventListener("statechange", () => {
+        if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+          newWorker.postMessage({ type: "SKIP_WAITING" });
+        }
+      });
+    });
+  } catch {
+    // The app still works when opened from file:// or a browser blocks registration.
+  }
 }
 
 const els = {

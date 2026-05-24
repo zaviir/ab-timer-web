@@ -1,4 +1,4 @@
-const CACHE_NAME = "ab-timer-v6";
+const CACHE_NAME = "ab-timer-v7";
 const APP_ASSETS = [
   "./",
   "./index.html",
@@ -33,21 +33,46 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  const request = event.request;
+  const shouldUseNetworkFirst =
+    request.mode === "navigate" ||
+    ["style", "script", "worker"].includes(request.destination) ||
+    request.url.endsWith("manifest.webmanifest");
 
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      return (
-        cachedResponse ||
-        fetch(event.request).then((networkResponse) => {
-          const responseCopy = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseCopy);
-          });
-          return networkResponse;
-        })
-      );
-    }),
-  );
+  if (shouldUseNetworkFirst) {
+    event.respondWith(networkFirst(request));
+    return;
+  }
+
+  event.respondWith(cacheFirst(request));
 });
+
+async function networkFirst(request) {
+  try {
+    const networkResponse = await fetch(request, { cache: "no-store" });
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(request, networkResponse.clone());
+    return networkResponse;
+  } catch {
+    const cachedResponse = await caches.match(request);
+    return cachedResponse || caches.match("./index.html");
+  }
+}
+
+async function cacheFirst(request) {
+  const cachedResponse = await caches.match(request);
+  if (cachedResponse) return cachedResponse;
+
+  const networkResponse = await fetch(request);
+  const cache = await caches.open(CACHE_NAME);
+  await cache.put(request, networkResponse.clone());
+  return networkResponse;
+}
