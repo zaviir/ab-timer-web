@@ -28,6 +28,10 @@ const state = {
   lastCountdownSecond: null,
 };
 
+const sound = {
+  context: null,
+};
+
 const saved = loadSavedSettings();
 if (saved) {
   state.moves = saved.moves;
@@ -305,9 +309,8 @@ function completePhase() {
   const phases = buildPhases();
   const nextIndex = state.phaseIndex + 1;
 
-  beep();
-
   if (nextIndex >= phases.length) {
+    playCue("complete");
     clearInterval(state.timerId);
     state.running = false;
     state.phaseIndex = phases.length - 1;
@@ -320,6 +323,7 @@ function completePhase() {
   state.remaining = phases[nextIndex].duration;
   state.lastTick = performance.now();
   state.lastCountdownSecond = Math.ceil(state.remaining);
+  playCue(phases[nextIndex].type);
   render();
 }
 
@@ -347,27 +351,70 @@ function playCountdownCue() {
   }
 
   state.lastCountdownSecond = wholeSecond;
-  beep(wholeSecond === 1 ? 880 : 660, 0.12);
+  playCue(wholeSecond === 1 ? "countdown-final" : "countdown");
 }
 
-function beep(frequency = 660, duration = 0.18) {
+function getAudioContext() {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContext) return;
+  if (!AudioContext) return null;
+  sound.context ||= new AudioContext();
+  if (sound.context.state === "suspended") {
+    sound.context.resume();
+  }
+  return sound.context;
+}
 
-  const context = new AudioContext();
+function playTone({ frequency, start = 0, duration = 0.16, type = "sine", volume = 0.15 }) {
+  const context = getAudioContext();
+  if (!context) return;
+
+  const startsAt = context.currentTime + start;
   const oscillator = context.createOscillator();
   const gain = context.createGain();
+  const filter = context.createBiquadFilter();
 
   oscillator.frequency.value = frequency;
-  oscillator.type = "sine";
-  gain.gain.setValueAtTime(0.0001, context.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.16, context.currentTime + 0.02);
-  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + duration);
+  oscillator.type = type;
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(2200, startsAt);
+  gain.gain.setValueAtTime(0.0001, startsAt);
+  gain.gain.exponentialRampToValueAtTime(volume, startsAt + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startsAt + duration);
 
-  oscillator.connect(gain);
+  oscillator.connect(filter);
+  filter.connect(gain);
   gain.connect(context.destination);
-  oscillator.start();
-  oscillator.stop(context.currentTime + duration + 0.02);
+  oscillator.start(startsAt);
+  oscillator.stop(startsAt + duration + 0.04);
+}
+
+function playCue(name) {
+  const cues = {
+    countdown: [{ frequency: 740, duration: 0.08, type: "triangle", volume: 0.12 }],
+    "countdown-final": [{ frequency: 980, duration: 0.14, type: "triangle", volume: 0.16 }],
+    work: [
+      { frequency: 523.25, duration: 0.12, type: "triangle", volume: 0.13 },
+      { frequency: 659.25, start: 0.1, duration: 0.14, type: "triangle", volume: 0.13 },
+      { frequency: 783.99, start: 0.2, duration: 0.18, type: "triangle", volume: 0.15 },
+    ],
+    rest: [
+      { frequency: 587.33, duration: 0.12, type: "sine", volume: 0.12 },
+      { frequency: 392, start: 0.12, duration: 0.2, type: "sine", volume: 0.13 },
+    ],
+    "set-rest": [
+      { frequency: 440, duration: 0.11, type: "triangle", volume: 0.12 },
+      { frequency: 349.23, start: 0.11, duration: 0.12, type: "triangle", volume: 0.12 },
+      { frequency: 293.66, start: 0.22, duration: 0.22, type: "triangle", volume: 0.14 },
+    ],
+    complete: [
+      { frequency: 523.25, duration: 0.12, type: "triangle", volume: 0.13 },
+      { frequency: 659.25, start: 0.11, duration: 0.12, type: "triangle", volume: 0.13 },
+      { frequency: 783.99, start: 0.22, duration: 0.12, type: "triangle", volume: 0.13 },
+      { frequency: 1046.5, start: 0.34, duration: 0.36, type: "triangle", volume: 0.15 },
+    ],
+  };
+
+  (cues[name] || cues.work).forEach(playTone);
 }
 
 function render(done = false) {
@@ -453,6 +500,7 @@ function renderMoves() {
 }
 
 els.startPauseButton.addEventListener("click", () => {
+  getAudioContext();
   const done = state.remaining <= 0 && state.phaseIndex === buildPhases().length - 1;
   if (done) {
     resetTimer(true);
