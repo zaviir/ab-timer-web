@@ -263,6 +263,14 @@ h1 {
   align-self: stretch;
 }
 
+.routine-summary {
+  display: none;
+}
+
+.routine-content {
+  display: block;
+}
+
 .panel-heading {
   margin-bottom: 18px;
 }
@@ -380,46 +388,148 @@ h1 {
 @media (max-width: 580px) {
   .app {
     width: 100%;
-    padding: env(safe-area-inset-top) 10px max(10px, env(safe-area-inset-bottom));
+    min-height: 100dvh;
+    padding: env(safe-area-inset-top) 8px max(8px, env(safe-area-inset-bottom));
+    gap: 8px;
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .timer-panel {
+    min-height: 0;
+    padding: 12px;
     gap: 10px;
   }
 
-  .timer-panel,
   .routine-panel {
-    padding: 14px;
+    min-height: auto;
+    padding: 0;
+    overflow: hidden;
+    box-shadow: 0 12px 30px rgba(44, 36, 27, 0.12);
+  }
+
+  .routine-summary {
+    min-height: 58px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .routine-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .summary-title,
+  .summary-detail,
+  .summary-action {
+    display: block;
+  }
+
+  .summary-title {
+    font-size: 0.98rem;
+    font-weight: 900;
+  }
+
+  .summary-detail {
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 750;
+  }
+
+  .summary-action {
+    padding: 8px 10px;
+    border: 1px solid rgba(50, 107, 142, 0.28);
+    border-radius: 8px;
+    color: var(--blue);
+    background: rgba(50, 107, 142, 0.08);
+    font-size: 0.82rem;
+    font-weight: 850;
+  }
+
+  .routine-panel[open] .summary-action {
+    color: var(--coral);
+    border-color: rgba(217, 105, 75, 0.28);
+    background: rgba(217, 105, 75, 0.1);
+  }
+
+  .routine-panel[open] .summary-action::before {
+    content: "Close ";
+  }
+
+  .routine-panel:not([open]) .routine-content {
+    display: none;
+  }
+
+  .routine-content {
+    padding: 0 12px 12px;
+  }
+
+  .panel-heading {
+    display: none;
   }
 
   .topbar {
-    align-items: end;
+    align-items: start;
   }
 
   .eyebrow {
-    font-size: 0.68rem;
+    font-size: 0.64rem;
   }
 
   h1 {
-    font-size: 2rem;
+    font-size: 1.65rem;
   }
 
   .stage {
-    min-height: min(66dvh, 470px);
-    gap: 12px;
+    min-height: 0;
+    align-content: center;
+    gap: 9px;
   }
 
   .phase-meta {
-    font-size: 0.78rem;
+    font-size: 0.72rem;
   }
 
   .time-ring {
-    --size: min(78vw, 310px);
+    --size: min(70vw, 270px, 36dvh);
   }
 
   .time {
-    font-size: clamp(4.4rem, 22vw, 7rem);
+    font-size: clamp(3.7rem, 19vw, 5.9rem);
+  }
+
+  .next-label {
+    min-height: 1.2rem;
+    font-size: 0.88rem;
   }
 
   #currentMove {
-    font-size: clamp(1.75rem, 9vw, 2.8rem);
+    font-size: clamp(1.45rem, 7.4vw, 2.35rem);
+  }
+
+  .elapsed-time {
+    min-height: 1.5rem;
+    font-size: 0.82rem;
+  }
+
+  .elapsed-time strong {
+    font-size: 1.08rem;
+  }
+
+  .up-next {
+    font-size: 0.94rem;
+  }
+
+  .controls {
+    gap: 8px;
+  }
+
+  button {
+    min-height: 42px;
   }
 
   .controls,
@@ -430,6 +540,20 @@ h1 {
 
   .workout-total strong {
     grid-row: auto;
+  }
+
+  .move-list {
+    margin-top: 12px;
+    gap: 8px;
+  }
+
+  .move-card {
+    grid-template-columns: 32px minmax(0, 1fr);
+    padding: 8px;
+  }
+
+  .move-index {
+    width: 32px;
   }
 }
 

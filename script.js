@@ -46,6 +46,8 @@ if ("serviceWorker" in navigator) {
 }
 
 const els = {
+  routinePanel: document.querySelector("#routinePanel"),
+  compactTotal: document.querySelector("#compactTotal"),
   setCount: document.querySelector("#setCount"),
   workDuration: document.querySelector("#workDuration"),
   restDuration: document.querySelector("#restDuration"),
@@ -343,6 +345,7 @@ function renderWorkoutTotal() {
 
   els.totalDuration.textContent = formatDuration(totalSeconds);
   els.totalBreakdown.textContent = `${formatDuration(workSeconds)} work, ${formatDuration(restSeconds)} rest`;
+  els.compactTotal.textContent = `${formatDuration(totalSeconds)} total`;
 }
 
 function renderMoves() {
@@ -423,4 +426,7 @@ els.setCount.value = state.sets;
 els.workDuration.value = state.work;
 els.restDuration.value = state.rest;
 els.setRestDuration.value = state.setRest;
+if (window.matchMedia("(max-width: 580px)").matches) {
+  els.routinePanel.removeAttribute("open");
+}
 resetTimer(false);
