@@ -68,6 +68,7 @@ const els = {
   skipButton: document.querySelector("#skipButton"),
   resetButton: document.querySelector("#resetButton"),
   restoreButton: document.querySelector("#restoreButton"),
+  addMoveButton: document.querySelector("#addMoveButton"),
 };
 
 function setMobileView(view) {
@@ -216,12 +217,12 @@ function loadSavedSettings() {
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (!parsed || !Array.isArray(parsed.moves)) return null;
+    const savedMoves = parsed.moves
+      .filter((move) => typeof move === "string" && move.trim())
+      .map((move) => move.trim());
 
     return {
-      moves: defaults.moves.map((_, index) => {
-        const move = parsed.moves[index];
-        return typeof move === "string" && move.trim() ? move.trim() : defaults.moves[index];
-      }),
+      moves: savedMoves.length ? savedMoves : [...defaults.moves],
       work: clampNumber(parsed.work, 5, 180, defaults.work),
       rest: clampNumber(parsed.rest, 0, 90, defaults.rest),
       setRest: clampNumber(parsed.setRest, 0, 300, defaults.setRest),
@@ -371,6 +372,7 @@ function renderMoves() {
     const label = document.createElement("label");
     const labelText = document.createElement("span");
     const input = document.createElement("input");
+    const removeButton = document.createElement("button");
 
     labelText.textContent = "Move";
     input.type = "text";
@@ -381,8 +383,20 @@ function renderMoves() {
       if (!state.running) resetTimer(false);
     });
 
+    removeButton.className = "remove-move-button";
+    removeButton.type = "button";
+    removeButton.textContent = "Remove";
+    removeButton.disabled = state.moves.length === 1;
+    removeButton.addEventListener("click", () => {
+      if (state.moves.length === 1) return;
+      state.moves.splice(index, 1);
+      saveSettings();
+      renderMoves();
+      resetTimer(state.running);
+    });
+
     label.append(labelText, input);
-    item.append(number, label);
+    item.append(number, label, removeButton);
     els.moveList.append(item);
   });
 }
@@ -430,6 +444,17 @@ els.restoreButton.addEventListener("click", () => {
   saveSettings();
   renderMoves();
   resetTimer(false);
+});
+
+els.addMoveButton.addEventListener("click", () => {
+  state.moves.push(`Move ${state.moves.length + 1}`);
+  saveSettings();
+  renderMoves();
+  resetTimer(state.running);
+  const inputs = els.moveList.querySelectorAll("input");
+  const newestInput = inputs[inputs.length - 1];
+  newestInput?.focus();
+  newestInput?.select();
 });
 
 [els.setCount, els.workDuration, els.restDuration, els.setRestDuration].forEach((input) => {

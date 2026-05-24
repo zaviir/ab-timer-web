@@ -338,9 +338,18 @@ h1 {
   font-weight: 700;
 }
 
+.add-move-button {
+  width: 100%;
+  margin-top: 12px;
+  border-color: rgba(47, 125, 101, 0.36);
+  color: var(--green-dark);
+  background: rgba(47, 125, 101, 0.09);
+  font-weight: 850;
+}
+
 .move-card {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-columns: 38px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
   padding: 10px;
@@ -363,6 +372,21 @@ h1 {
   color: #fff;
   background: var(--green-dark);
   font-weight: 900;
+}
+
+.remove-move-button {
+  min-height: 38px;
+  padding: 0 10px;
+  color: var(--coral);
+  border-color: rgba(217, 105, 75, 0.28);
+  background: rgba(217, 105, 75, 0.08);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.remove-move-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
 }
 
 @media (max-width: 900px) {
@@ -518,6 +542,11 @@ h1 {
 
   .move-index {
     width: 32px;
+  }
+
+  .remove-move-button {
+    grid-column: 2;
+    min-height: 34px;
   }
 
   .mobile-tabbar {
