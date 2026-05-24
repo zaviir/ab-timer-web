@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title>Ab Timer</title>
+  <rect width="512" height="512" rx="112" fill="#2f7d65" />
+  <circle cx="256" cy="256" r="168" fill="#fffdf8" opacity="0.96" />
+  <path
+    d="M256 104a152 152 0 1 1-107.5 259.5"
+    fill="none"
+    stroke="#d9694b"
+    stroke-width="34"
+    stroke-linecap="round"
+  />
+  <path
+    d="M256 148v110l76 52"
+    fill="none"
+    stroke="#18212a"
+    stroke-width="30"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M154 342c25 27 60 42 102 42 43 0 79-16 104-44"
+    fill="none"
+    stroke="#326b8e"
+    stroke-width="24"
+    stroke-linecap="round"
+  />
+</svg>

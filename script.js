@@ -1,0 +1,426 @@
+const defaults = {
+  moves: [
+    "Hollow Body Crunches",
+    "Straight-Leg Reverse Crunches",
+    "Russian Twists",
+    "V-Ups",
+  ],
+  work: 30,
+  rest: 10,
+  setRest: 60,
+  ready: 10,
+  sets: 3,
+};
+
+const STORAGE_KEY = "ab-timer-settings";
+
+const state = {
+  moves: [...defaults.moves],
+  work: defaults.work,
+  rest: defaults.rest,
+  setRest: defaults.setRest,
+  sets: defaults.sets,
+  phaseIndex: 0,
+  remaining: defaults.work,
+  running: false,
+  timerId: null,
+  lastTick: 0,
+  lastCountdownSecond: null,
+};
+
+const saved = loadSavedSettings();
+if (saved) {
+  state.moves = saved.moves;
+  state.work = saved.work;
+  state.rest = saved.rest;
+  state.setRest = saved.setRest;
+  state.sets = saved.sets;
+}
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js").catch(() => {
+      // The app still works when opened from file:// or a browser blocks registration.
+    });
+  });
+}
+
+const els = {
+  setCount: document.querySelector("#setCount"),
+  workDuration: document.querySelector("#workDuration"),
+  restDuration: document.querySelector("#restDuration"),
+  setRestDuration: document.querySelector("#setRestDuration"),
+  totalDuration: document.querySelector("#totalDuration"),
+  totalBreakdown: document.querySelector("#totalBreakdown"),
+  moveList: document.querySelector("#moveList"),
+  phaseType: document.querySelector("#phaseType"),
+  setLabel: document.querySelector("#setLabel"),
+  timeDisplay: document.querySelector("#timeDisplay"),
+  timeRing: document.querySelector("#timeRing"),
+  nextLabel: document.querySelector("#nextLabel"),
+  currentMove: document.querySelector("#currentMove"),
+  elapsedTime: document.querySelector("#elapsedTime"),
+  elapsedTotal: document.querySelector("#elapsedTotal"),
+  upNext: document.querySelector("#upNext"),
+  startPauseButton: document.querySelector("#startPauseButton"),
+  skipButton: document.querySelector("#skipButton"),
+  resetButton: document.querySelector("#resetButton"),
+  restoreButton: document.querySelector("#restoreButton"),
+};
+
+function buildPhases() {
+  const phases = [
+    {
+      type: "ready",
+      label: "Get Ready",
+      duration: defaults.ready,
+      set: 1,
+      moveIndex: -1,
+    },
+  ];
+
+  for (let set = 1; set <= state.sets; set += 1) {
+    state.moves.forEach((move, index) => {
+      phases.push({
+        type: "work",
+        label: move,
+        duration: state.work,
+        set,
+        moveIndex: index,
+      });
+
+      const isLastMove = index === state.moves.length - 1;
+      const isLastSet = set === state.sets;
+
+      if (!isLastMove && state.rest > 0) {
+        phases.push({
+          type: "rest",
+          label: "Rest",
+          duration: state.rest,
+          set,
+          moveIndex: index,
+        });
+      }
+
+      if (isLastMove && !isLastSet && state.setRest > 0) {
+        phases.push({
+          type: "set-rest",
+          label: "Set Rest",
+          duration: state.setRest,
+          set,
+          moveIndex: index,
+        });
+      }
+    });
+  }
+
+  return phases;
+}
+
+function currentPhase() {
+  const phases = buildPhases();
+  return phases[Math.min(state.phaseIndex, phases.length - 1)];
+}
+
+function nextPhase() {
+  return buildPhases()[state.phaseIndex + 1] || null;
+}
+
+function formatSeconds(totalSeconds) {
+  const seconds = Math.max(0, Math.ceil(totalSeconds));
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+
+  if (minutes === 0) return String(remainder);
+  return `${minutes}:${String(remainder).padStart(2, "0")}`;
+}
+
+function formatDuration(totalSeconds) {
+  const seconds = Math.max(0, Math.round(totalSeconds));
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${minutes}:${String(remainder).padStart(2, "0")}`;
+}
+
+function workoutTotals() {
+  const phases = buildPhases();
+  const totalSeconds = phases.reduce((total, phase) => total + phase.duration, 0);
+  const completedSeconds = phases
+    .slice(0, state.phaseIndex)
+    .reduce((total, phase) => total + phase.duration, 0);
+  const phaseElapsed = currentPhase() ? currentPhase().duration - state.remaining : 0;
+
+  return {
+    totalSeconds,
+    elapsedSeconds: Math.max(0, Math.min(totalSeconds, completedSeconds + phaseElapsed)),
+  };
+}
+
+function phaseName(phase) {
+  if (!phase) return "Complete";
+  if (phase.type === "ready") return "Ready";
+  if (phase.type === "work") return "Work";
+  if (phase.type === "set-rest") return "Set Rest";
+  return "Rest";
+}
+
+function describeNext(phase) {
+  if (!phase) return "Workout complete";
+  if (phase.type === "work") return phase.label;
+  if (phase.type === "ready") return `${phase.duration} sec countdown`;
+  return `${phase.duration} sec ${phaseName(phase).toLowerCase()}`;
+}
+
+function syncSettingsFromInputs() {
+  state.sets = clampNumber(els.setCount.value, 1, 12, defaults.sets);
+  state.work = clampNumber(els.workDuration.value, 5, 180, defaults.work);
+  state.rest = clampNumber(els.restDuration.value, 0, 90, defaults.rest);
+  state.setRest = clampNumber(els.setRestDuration.value, 0, 300, defaults.setRest);
+  saveSettings();
+}
+
+function clampNumber(value, min, max, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function resetTimer(keepRunning = false) {
+  clearInterval(state.timerId);
+  syncSettingsFromInputs();
+  state.phaseIndex = 0;
+  state.remaining = currentPhase().duration;
+  state.running = keepRunning;
+  state.lastTick = performance.now();
+  state.lastCountdownSecond = Math.ceil(state.remaining);
+
+  if (keepRunning) {
+    state.timerId = window.setInterval(tick, 250);
+  }
+
+  render();
+}
+
+function loadSavedSettings() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (!parsed || !Array.isArray(parsed.moves)) return null;
+
+    return {
+      moves: defaults.moves.map((_, index) => {
+        const move = parsed.moves[index];
+        return typeof move === "string" && move.trim() ? move.trim() : defaults.moves[index];
+      }),
+      work: clampNumber(parsed.work, 5, 180, defaults.work),
+      rest: clampNumber(parsed.rest, 0, 90, defaults.rest),
+      setRest: clampNumber(parsed.setRest, 0, 300, defaults.setRest),
+      sets: clampNumber(parsed.sets, 1, 12, defaults.sets),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveSettings() {
+  try {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        moves: state.moves,
+        work: state.work,
+        rest: state.rest,
+        setRest: state.setRest,
+        sets: state.sets,
+      }),
+    );
+  } catch {
+    // The timer still works if browser storage is unavailable.
+  }
+}
+
+function completePhase() {
+  const phases = buildPhases();
+  const nextIndex = state.phaseIndex + 1;
+
+  beep();
+
+  if (nextIndex >= phases.length) {
+    clearInterval(state.timerId);
+    state.running = false;
+    state.phaseIndex = phases.length - 1;
+    state.remaining = 0;
+    render(true);
+    return;
+  }
+
+  state.phaseIndex = nextIndex;
+  state.remaining = phases[nextIndex].duration;
+  state.lastTick = performance.now();
+  state.lastCountdownSecond = Math.ceil(state.remaining);
+  render();
+}
+
+function tick() {
+  const now = performance.now();
+  const elapsed = (now - state.lastTick) / 1000;
+  state.lastTick = now;
+  state.remaining -= elapsed;
+
+  if (state.remaining <= 0) {
+    completePhase();
+    return;
+  }
+
+  playCountdownCue();
+  render();
+}
+
+function playCountdownCue() {
+  const phase = currentPhase();
+  const wholeSecond = Math.ceil(state.remaining);
+
+  if (phase?.type !== "ready" || wholeSecond > 3 || wholeSecond === state.lastCountdownSecond) {
+    return;
+  }
+
+  state.lastCountdownSecond = wholeSecond;
+  beep(wholeSecond === 1 ? 880 : 660, 0.12);
+}
+
+function beep(frequency = 660, duration = 0.18) {
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return;
+
+  const context = new AudioContext();
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+
+  oscillator.frequency.value = frequency;
+  oscillator.type = "sine";
+  gain.gain.setValueAtTime(0.0001, context.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.16, context.currentTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + duration);
+
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start();
+  oscillator.stop(context.currentTime + duration + 0.02);
+}
+
+function render(done = false) {
+  const phase = currentPhase();
+  const next = nextPhase();
+  const duration = phase?.duration || 1;
+  const elapsedPercent = done ? 100 : ((duration - state.remaining) / duration) * 100;
+  const activeMoveIndex = phase?.type === "work" ? phase.moveIndex : -1;
+  const totals = workoutTotals();
+
+  els.phaseType.textContent = done ? "Done" : phaseName(phase);
+  els.setLabel.textContent = `Set ${Math.min(phase?.set || 1, state.sets)} of ${state.sets}`;
+  els.timeDisplay.textContent = done ? "0" : formatSeconds(state.remaining);
+  els.currentMove.textContent = done ? "Workout Complete" : phase.label;
+  els.nextLabel.textContent = done ? "Nice work" : describeNext(phase);
+  els.elapsedTime.textContent = formatDuration(done ? totals.totalSeconds : totals.elapsedSeconds);
+  els.elapsedTotal.textContent = `/ ${formatDuration(totals.totalSeconds)}`;
+  els.upNext.textContent = done ? "All sets finished" : `Next: ${describeNext(next)}`;
+  els.timeRing.style.setProperty("--progress", Math.max(0, Math.min(100, elapsedPercent)));
+  els.timeRing.classList.toggle("break", phase?.type === "rest");
+  els.timeRing.classList.toggle("set-break", phase?.type === "set-rest");
+  els.timeRing.classList.toggle("ready", phase?.type === "ready");
+  els.startPauseButton.textContent = state.running ? "Pause" : done ? "Start Over" : "Start";
+  els.startPauseButton.classList.toggle("running", state.running);
+  renderWorkoutTotal();
+
+  document.querySelectorAll(".move-card").forEach((card, index) => {
+    card.classList.toggle("active", index === activeMoveIndex);
+  });
+}
+
+function renderWorkoutTotal() {
+  const { totalSeconds } = workoutTotals();
+  const workSeconds = state.moves.length * state.work * state.sets;
+  const restSeconds = Math.max(0, totalSeconds - workSeconds - defaults.ready);
+
+  els.totalDuration.textContent = formatDuration(totalSeconds);
+  els.totalBreakdown.textContent = `${formatDuration(workSeconds)} work, ${formatDuration(restSeconds)} rest`;
+}
+
+function renderMoves() {
+  els.moveList.innerHTML = "";
+
+  state.moves.forEach((move, index) => {
+    const item = document.createElement("li");
+    item.className = "move-card";
+
+    const number = document.createElement("span");
+    number.className = "move-index";
+    number.textContent = index + 1;
+
+    const label = document.createElement("label");
+    const labelText = document.createElement("span");
+    const input = document.createElement("input");
+
+    labelText.textContent = "Move";
+    input.type = "text";
+    input.value = move;
+    input.addEventListener("input", () => {
+      state.moves[index] = input.value.trim() || defaults.moves[index] || "Core Move";
+      saveSettings();
+      if (!state.running) resetTimer(false);
+    });
+
+    label.append(labelText, input);
+    item.append(number, label);
+    els.moveList.append(item);
+  });
+}
+
+els.startPauseButton.addEventListener("click", () => {
+  const done = state.remaining <= 0 && state.phaseIndex === buildPhases().length - 1;
+  if (done) {
+    resetTimer(true);
+    return;
+  }
+
+  state.running = !state.running;
+
+  if (state.running) {
+    syncSettingsFromInputs();
+    state.lastTick = performance.now();
+    state.timerId = window.setInterval(tick, 250);
+  } else {
+    clearInterval(state.timerId);
+  }
+
+  render();
+});
+
+els.skipButton.addEventListener("click", () => {
+  completePhase();
+});
+
+els.resetButton.addEventListener("click", () => {
+  resetTimer(false);
+});
+
+els.restoreButton.addEventListener("click", () => {
+  state.moves = [...defaults.moves];
+  els.setCount.value = defaults.sets;
+  els.workDuration.value = defaults.work;
+  els.restDuration.value = defaults.rest;
+  els.setRestDuration.value = defaults.setRest;
+  saveSettings();
+  renderMoves();
+  resetTimer(false);
+});
+
+[els.setCount, els.workDuration, els.restDuration, els.setRestDuration].forEach((input) => {
+  input.addEventListener("change", () => resetTimer(state.running));
+});
+
+renderMoves();
+els.setCount.value = state.sets;
+els.workDuration.value = state.work;
+els.restDuration.value = state.rest;
+els.setRestDuration.value = state.setRest;
+resetTimer(false);

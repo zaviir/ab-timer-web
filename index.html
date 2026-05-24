@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#2f7d65" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Ab Timer" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta
+      name="description"
+      content="A focused home ab workout timer with editable sets, intervals, and offline support."
+    />
+    <title>Ab Timer</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="timer-panel" aria-label="Workout timer">
+        <div class="topbar">
+          <div>
+            <p class="eyebrow">Home core timer</p>
+            <h1>Ab Timer</h1>
+          </div>
+        </div>
+
+        <div class="stage" id="stage">
+          <div class="phase-meta">
+            <span id="phaseType">Ready</span>
+            <span id="setLabel">Set 1 of 3</span>
+          </div>
+
+          <div class="time-ring" id="timeRing" style="--progress: 0">
+            <div class="ring-center">
+              <div class="time" id="timeDisplay">30</div>
+              <div class="next-label" id="nextLabel">Hollow Body Crunches</div>
+            </div>
+          </div>
+
+          <h2 id="currentMove">Hollow Body Crunches</h2>
+          <div class="elapsed-time" aria-live="polite">
+            <span>Elapsed</span>
+            <strong id="elapsedTime">0:00</strong>
+            <span id="elapsedTotal">/ 0:00</span>
+          </div>
+          <p class="up-next" id="upNext">Next: 10 sec rest</p>
+        </div>
+
+        <div class="controls" aria-label="Timer controls">
+          <button class="primary" id="startPauseButton" type="button">Start</button>
+          <button id="skipButton" type="button" aria-label="Skip phase">Skip</button>
+          <button id="resetButton" type="button" aria-label="Reset timer">Reset</button>
+        </div>
+      </section>
+
+      <aside class="routine-panel" aria-label="Routine settings">
+        <div class="panel-heading">
+          <h2>Routine</h2>
+          <button id="restoreButton" type="button">Restore</button>
+        </div>
+
+        <div class="timing-grid">
+          <label>
+            <span>Sets</span>
+            <input id="setCount" type="number" min="1" max="12" step="1" value="3" />
+          </label>
+          <label>
+            <span>Work</span>
+            <input id="workDuration" type="number" min="5" max="180" step="5" value="30" />
+          </label>
+          <label>
+            <span>Rest</span>
+            <input id="restDuration" type="number" min="0" max="90" step="5" value="10" />
+          </label>
+          <label>
+            <span>Set rest</span>
+            <input id="setRestDuration" type="number" min="0" max="300" step="5" value="60" />
+          </label>
+        </div>
+
+        <div class="workout-total" aria-live="polite">
+          <span>Total workout</span>
+          <strong id="totalDuration">0:00</strong>
+          <small id="totalBreakdown">Includes get-ready countdown</small>
+        </div>
+
+        <ol class="move-list" id="moveList"></ol>
+      </aside>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
