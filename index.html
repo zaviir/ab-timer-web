@@ -56,15 +56,7 @@
         </div>
       </section>
 
-      <details class="routine-panel" id="routinePanel" aria-label="Routine settings" open>
-        <summary class="routine-summary">
-          <span>
-            <span class="summary-title">Routine</span>
-            <span class="summary-detail" id="compactTotal">0:00 total</span>
-          </span>
-          <span class="summary-action">Settings</span>
-        </summary>
-
+      <aside class="routine-panel" id="routinePanel" aria-label="Routine settings">
         <div class="routine-content">
           <div class="panel-heading">
             <h2>Routine</h2>
@@ -98,8 +90,20 @@
 
           <ol class="move-list" id="moveList"></ol>
         </div>
-      </details>
+      </aside>
     </main>
+
+    <nav class="mobile-tabbar" aria-label="Primary views">
+      <button class="tab-button active" type="button" data-view="timer" aria-pressed="true">
+        <span class="tab-icon" aria-hidden="true"></span>
+        <span>Timer</span>
+      </button>
+      <button class="tab-button" type="button" data-view="routine" aria-pressed="false">
+        <span class="tab-icon" aria-hidden="true"></span>
+        <span>Routine</span>
+        <small id="compactTotal">0:00</small>
+      </button>
+    </nav>
 
     <script src="script.js"></script>
   </body>

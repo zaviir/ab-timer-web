@@ -46,8 +46,8 @@ if ("serviceWorker" in navigator) {
 }
 
 const els = {
-  routinePanel: document.querySelector("#routinePanel"),
   compactTotal: document.querySelector("#compactTotal"),
+  tabButtons: document.querySelectorAll(".tab-button"),
   setCount: document.querySelector("#setCount"),
   workDuration: document.querySelector("#workDuration"),
   restDuration: document.querySelector("#restDuration"),
@@ -69,6 +69,15 @@ const els = {
   resetButton: document.querySelector("#resetButton"),
   restoreButton: document.querySelector("#restoreButton"),
 };
+
+function setMobileView(view) {
+  document.body.dataset.mobileView = view;
+  els.tabButtons.forEach((button) => {
+    const isActive = button.dataset.view === view;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+}
 
 function buildPhases() {
   const phases = [
@@ -406,6 +415,12 @@ els.resetButton.addEventListener("click", () => {
   resetTimer(false);
 });
 
+els.tabButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    setMobileView(button.dataset.view);
+  });
+});
+
 els.restoreButton.addEventListener("click", () => {
   state.moves = [...defaults.moves];
   els.setCount.value = defaults.sets;
@@ -426,7 +441,5 @@ els.setCount.value = state.sets;
 els.workDuration.value = state.work;
 els.restDuration.value = state.rest;
 els.setRestDuration.value = state.setRest;
-if (window.matchMedia("(max-width: 580px)").matches) {
-  els.routinePanel.removeAttribute("open");
-}
+setMobileView("timer");
 resetTimer(false);
