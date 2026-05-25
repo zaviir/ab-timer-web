@@ -32,6 +32,17 @@ const sound = {
   context: null,
 };
 
+const speech = {
+  voice: null,
+};
+
+if ("speechSynthesis" in window) {
+  window.speechSynthesis.onvoiceschanged = () => {
+    speech.voice = null;
+    getSpeechVoice();
+  };
+}
+
 const saved = loadSavedSettings();
 if (saved) {
   state.moves = saved.moves;
@@ -311,6 +322,7 @@ function completePhase() {
 
   if (nextIndex >= phases.length) {
     playCue("complete");
+    announce("Workout done.");
     clearInterval(state.timerId);
     state.running = false;
     state.phaseIndex = phases.length - 1;
@@ -324,6 +336,7 @@ function completePhase() {
   state.lastTick = performance.now();
   state.lastCountdownSecond = Math.ceil(state.remaining);
   playCue(phases[nextIndex].type);
+  announcePhase(phases[nextIndex]);
   render();
 }
 
@@ -352,6 +365,7 @@ function playCountdownCue() {
 
   state.lastCountdownSecond = wholeSecond;
   playCue(wholeSecond === 1 ? "countdown-final" : "countdown");
+  announce(String(wholeSecond), { rate: 1.12, pitch: 0.92 });
 }
 
 function getAudioContext() {
@@ -415,6 +429,50 @@ function playCue(name) {
   };
 
   (cues[name] || cues.work).forEach(playTone);
+}
+
+function getSpeechVoice() {
+  if (!("speechSynthesis" in window)) return null;
+  const voices = window.speechSynthesis.getVoices();
+  speech.voice ||=
+    voices.find((voice) => voice.lang.startsWith("en") && /samantha|alex|daniel/i.test(voice.name)) ||
+    voices.find((voice) => voice.lang.startsWith("en")) ||
+    null;
+  return speech.voice;
+}
+
+function prepareSpeech() {
+  if (!("speechSynthesis" in window)) return;
+  getSpeechVoice();
+  window.speechSynthesis.resume();
+}
+
+function announce(text, options = {}) {
+  if (!("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.voice = getSpeechVoice();
+  utterance.volume = options.volume ?? 1;
+  utterance.rate = options.rate ?? 0.94;
+  utterance.pitch = options.pitch ?? 0.86;
+  window.speechSynthesis.speak(utterance);
+}
+
+function announcePhase(phase) {
+  if (phase.type === "work") {
+    announce(`Go. ${phase.label}.`, { rate: 0.95, pitch: 0.9 });
+    return;
+  }
+
+  if (phase.type === "rest") {
+    announce("Rest.", { rate: 0.9, pitch: 0.82 });
+    return;
+  }
+
+  if (phase.type === "set-rest") {
+    announce("Set rest.", { rate: 0.9, pitch: 0.82 });
+  }
 }
 
 function render(done = false) {
@@ -501,6 +559,7 @@ function renderMoves() {
 
 els.startPauseButton.addEventListener("click", () => {
   getAudioContext();
+  prepareSpeech();
   const done = state.remaining <= 0 && state.phaseIndex === buildPhases().length - 1;
   if (done) {
     resetTimer(true);
@@ -513,6 +572,9 @@ els.startPauseButton.addEventListener("click", () => {
     syncSettingsFromInputs();
     state.lastTick = performance.now();
     state.timerId = window.setInterval(tick, 250);
+    if (currentPhase()?.type === "ready" && Math.ceil(state.remaining) === defaults.ready) {
+      announce("Get ready.", { rate: 0.94, pitch: 0.88 });
+    }
   } else {
     clearInterval(state.timerId);
   }
