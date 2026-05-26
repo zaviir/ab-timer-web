@@ -204,6 +204,12 @@ function nextPhase() {
   return buildPhases()[state.phaseIndex + 1] || null;
 }
 
+function nextWorkPhase(fromIndex = state.phaseIndex) {
+  return buildPhases()
+    .slice(fromIndex + 1)
+    .find((phase) => phase.type === "work");
+}
+
 function formatSeconds(totalSeconds) {
   const seconds = Math.max(0, Math.ceil(totalSeconds));
   const minutes = Math.floor(seconds / 60);
@@ -336,7 +342,7 @@ function completePhase() {
   state.lastTick = performance.now();
   state.lastCountdownSecond = Math.ceil(state.remaining);
   playCue(phases[nextIndex].type);
-  announcePhase(phases[nextIndex]);
+  announcePhase(phases[nextIndex], nextWorkPhase(nextIndex));
   render();
 }
 
@@ -459,19 +465,19 @@ function announce(text, options = {}) {
   window.speechSynthesis.speak(utterance);
 }
 
-function announcePhase(phase) {
+function announcePhase(phase, upcomingWork) {
   if (phase.type === "work") {
-    announce(`Go. ${phase.label}.`, { rate: 0.95, pitch: 0.9 });
+    announce("Go.", { rate: 0.95, pitch: 0.9 });
     return;
   }
 
   if (phase.type === "rest") {
-    announce("Rest.", { rate: 0.9, pitch: 0.82 });
+    announce(`Rest. Next: ${upcomingWork?.label || "work"}.`, { rate: 0.92, pitch: 0.82 });
     return;
   }
 
   if (phase.type === "set-rest") {
-    announce("Set rest.", { rate: 0.9, pitch: 0.82 });
+    announce(`Set rest. Next: ${upcomingWork?.label || "work"}.`, { rate: 0.9, pitch: 0.82 });
   }
 }
 
@@ -573,7 +579,10 @@ els.startPauseButton.addEventListener("click", () => {
     state.lastTick = performance.now();
     state.timerId = window.setInterval(tick, 250);
     if (currentPhase()?.type === "ready" && Math.ceil(state.remaining) === defaults.ready) {
-      announce("Get ready.", { rate: 0.94, pitch: 0.88 });
+      announce(`Get ready. First: ${nextWorkPhase(-1)?.label || "work"}.`, {
+        rate: 0.94,
+        pitch: 0.88,
+      });
     }
   } else {
     clearInterval(state.timerId);
