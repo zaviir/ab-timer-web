@@ -36,6 +36,12 @@ const speech = {
   voice: null,
 };
 
+const wake = {
+  lock: null,
+  supported: "wakeLock" in navigator,
+  failed: false,
+};
+
 if ("speechSynthesis" in window) {
   window.speechSynthesis.onvoiceschanged = () => {
     speech.voice = null;
@@ -104,6 +110,7 @@ async function registerServiceWorker() {
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") {
         registration.update().then(() => activateWaitingWorker(registration));
+        requestWakeLock();
       }
     });
   } catch {
@@ -133,6 +140,7 @@ const els = {
   startPauseButton: document.querySelector("#startPauseButton"),
   skipButton: document.querySelector("#skipButton"),
   resetButton: document.querySelector("#resetButton"),
+  wakeStatus: document.querySelector("#wakeStatus"),
   restoreButton: document.querySelector("#restoreButton"),
   addMoveButton: document.querySelector("#addMoveButton"),
 };
@@ -280,6 +288,9 @@ function resetTimer(keepRunning = false) {
 
   if (keepRunning) {
     state.timerId = window.setInterval(tick, 250);
+    requestWakeLock();
+  } else {
+    releaseWakeLock();
   }
 
   render();
@@ -329,6 +340,7 @@ function completePhase() {
   if (nextIndex >= phases.length) {
     playCue("complete");
     announce("Workout done.");
+    releaseWakeLock();
     clearInterval(state.timerId);
     state.running = false;
     state.phaseIndex = phases.length - 1;
@@ -344,6 +356,72 @@ function completePhase() {
   playCue(phases[nextIndex].type);
   announcePhase(phases[nextIndex], nextWorkPhase(nextIndex));
   render();
+}
+
+async function requestWakeLock() {
+  if (!state.running || document.visibilityState !== "visible") return;
+
+  if (!wake.supported) {
+    wake.failed = true;
+    renderWakeStatus();
+    return;
+  }
+
+  try {
+    if (wake.lock) {
+      renderWakeStatus();
+      return;
+    }
+    wake.lock = await navigator.wakeLock.request("screen");
+    wake.failed = false;
+    wake.lock.addEventListener("release", () => {
+      wake.lock = null;
+      renderWakeStatus();
+    });
+  } catch {
+    wake.lock = null;
+    wake.failed = true;
+  }
+
+  renderWakeStatus();
+}
+
+window.addEventListener("focus", () => {
+  requestWakeLock();
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    requestWakeLock();
+  }
+});
+
+async function releaseWakeLock() {
+  if (!wake.lock) {
+    renderWakeStatus();
+    return;
+  }
+
+  const lock = wake.lock;
+  wake.lock = null;
+  await lock.release().catch(() => {});
+  renderWakeStatus();
+}
+
+function renderWakeStatus() {
+  if (!els.wakeStatus) return;
+  els.wakeStatus.classList.toggle("visible", state.running);
+  els.wakeStatus.classList.toggle("warning", state.running && !wake.lock);
+
+  if (!state.running) {
+    els.wakeStatus.textContent = "";
+  } else if (wake.lock) {
+    els.wakeStatus.textContent = "Screen awake";
+  } else if (wake.failed) {
+    els.wakeStatus.textContent = "Auto-lock risk";
+  } else {
+    els.wakeStatus.textContent = "Waking screen";
+  }
 }
 
 function tick() {
@@ -503,6 +581,7 @@ function render(done = false) {
   els.timeRing.classList.toggle("ready", phase?.type === "ready");
   els.startPauseButton.textContent = state.running ? "Pause" : done ? "Start Over" : "Start";
   els.startPauseButton.classList.toggle("running", state.running);
+  renderWakeStatus();
   renderWorkoutTotal();
 
   document.querySelectorAll(".move-card").forEach((card, index) => {
@@ -578,6 +657,7 @@ els.startPauseButton.addEventListener("click", () => {
     syncSettingsFromInputs();
     state.lastTick = performance.now();
     state.timerId = window.setInterval(tick, 250);
+    requestWakeLock();
     if (currentPhase()?.type === "ready" && Math.ceil(state.remaining) === defaults.ready) {
       announce(`Get ready. First: ${nextWorkPhase(-1)?.label || "work"}.`, {
         rate: 0.94,
@@ -586,6 +666,7 @@ els.startPauseButton.addEventListener("click", () => {
     }
   } else {
     clearInterval(state.timerId);
+    releaseWakeLock();
   }
 
   render();

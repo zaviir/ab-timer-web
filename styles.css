@@ -144,6 +144,30 @@ h1 {
   letter-spacing: 0;
 }
 
+.wake-status {
+  min-height: 28px;
+  display: none;
+  align-items: center;
+  padding: 5px 9px;
+  border: 1px solid rgba(47, 125, 101, 0.26);
+  border-radius: 8px;
+  color: var(--green-dark);
+  background: rgba(47, 125, 101, 0.08);
+  font-size: 0.75rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.wake-status.visible {
+  display: inline-flex;
+}
+
+.wake-status.warning {
+  color: var(--coral);
+  border-color: rgba(217, 105, 75, 0.3);
+  background: rgba(217, 105, 75, 0.08);
+}
+
 .stage {
   min-height: 460px;
   display: grid;
@@ -458,6 +482,7 @@ h1 {
 
   .topbar {
     align-items: start;
+    gap: 10px;
   }
 
   .eyebrow {
@@ -466,6 +491,12 @@ h1 {
 
   h1 {
     font-size: 1.65rem;
+  }
+
+  .wake-status {
+    min-height: 26px;
+    padding: 4px 7px;
+    font-size: 0.66rem;
   }
 
   .stage {
